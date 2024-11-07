@@ -6,7 +6,7 @@ import matplotlib.colors
 import matplotlib.pyplot as plt
 
 
-def create_custom_cmap(color_dict):
+def create_custom_cmap(color_dict : dict):
     pixel_values = [value[0] for value in color_dict.values()]
     colors = color_dict.keys()
 
