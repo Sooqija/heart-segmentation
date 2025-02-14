@@ -9,6 +9,7 @@ build
 # folders
 checkpoints
 data
+runs
 
 # ide
 .vscode
