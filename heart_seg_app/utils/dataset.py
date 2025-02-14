@@ -76,9 +76,9 @@ class LabelPreprocessing(object):
     
 
 def label_postprocessing(label: torch.Tensor):
-    label = torch.softmax(label, dim=1).argmax(dim=1).to("cpu").squeeze(0)
+    label = torch.softmax(label, dim=1).argmax(dim=1).squeeze(0)
     label_values = list(range(8))
-    processed_label = torch.zeros(size=(len(label_values), *label.shape), dtype=torch.int32)
+    processed_label = torch.zeros(size=(len(label_values), *label.shape), dtype=torch.int32, device="cuda")
     for i, value in enumerate(label_values):
         processed_label[i] = torch.where(label == value, 1, 0)
 
