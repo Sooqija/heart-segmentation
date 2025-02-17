@@ -1,10 +1,14 @@
+import torch
+from torchvision.utils import make_grid
+
 import vtk
 import numpy as np
 
 import matplotlib
 import matplotlib.colors
-import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
+from PIL import Image
 
 def create_custom_cmap(color_dict : dict):
     pixel_values = [value[0] for value in color_dict.values()]
@@ -134,3 +138,38 @@ def vtk_visualize_3d_scan(data : np.ndarray, color_dict : dict, apply_cfilter: b
     renderer.Render()
     window.Render()
     interactor.Start()
+    
+def make_grid_image(mode : str, image : torch.Tensor, label : torch.Tensor, prediction : torch.Tensor, label_color_map,idx):
+        bone_cmap = cm.get_cmap("bone")
+        cmap, norm = create_custom_cmap(label_color_map)
+
+        image = image.squeeze().cpu() # delete batch
+        image = image[:,:,idx].T
+        image = bone_cmap(image).astype(np.float32) # it converts tensor to numpy rgba image with hwc format
+        image = torch.from_numpy(image)
+        image = image[:,:,:3] # delete alpha channel
+        image = image.permute(2, 0, 1) # hwc -> chw
+        
+        label = label.squeeze().cpu() # delete batch
+        label = torch.argmax(label, dim=0)
+        label = label[:,:,idx].T
+        label = cmap(norm(label)).astype(np.float32) # it converts tensor to numpy rgba image with hwc format
+        label = torch.from_numpy(label)
+        label = label[:,:,:3] # delete alpha channel
+        label = label.permute(2, 0, 1) # hwc -> chw
+        
+        prediction = prediction.squeeze().float().cpu() # delete batch
+        prediction = torch.softmax(prediction, dim=0).argmax(dim=0)
+        prediction = prediction[:,:,idx].T
+        prediction = cmap(norm(prediction)).astype(np.float32) # it converts tensor to numpy rgba image with hwc format
+        prediction = torch.from_numpy(prediction)
+        prediction = prediction[:,:,:3] # delete alpha channel
+        prediction = prediction.permute(2, 0, 1) # hwc -> chw
+        
+        img_grid = make_grid([image, label, prediction])
+        if mode == "tensorboard":
+            return img_grid
+        if mode == "eval":
+            img_grid = Image.fromarray((img_grid.permute(1, 2, 0).numpy() * 255).astype("uint8"))
+        
+        return img_grid

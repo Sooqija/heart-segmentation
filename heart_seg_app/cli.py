@@ -1,5 +1,6 @@
 import argparse
 from heart_seg_app.train import train
+from heart_seg_app.evaluate import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description="Heart Segmentation App")
@@ -24,6 +25,13 @@ def main():
               epochs=args.epochs)
     elif args.mode == "eval":
         print("Evaluation mode")
+        evaluate(model=args.model,
+                 image_dir=args.image_dir,
+                 label_dir=args.label_dir,
+                 checkpoint=args.checkpoint,
+                 output_dir=args.output_dir,
+                 tag=args.tag)
+        
 
 if __name__ == "__main__":
     main()
