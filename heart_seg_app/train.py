@@ -11,6 +11,28 @@ from heart_seg_app.utils.dataset import Dataset, ImagePreprocessing, LabelPrepro
 from heart_seg_app.utils.metrics import Metrics
 from heart_seg_app.models.unetr import unetr
 
+
+from monai.apps import DecathlonDataset
+
+from monai.transforms import (
+    Activations,
+    Activationsd,
+    AsDiscrete,
+    AsDiscreted,
+    Compose,
+    Invertd,
+    LoadImaged,
+    MapTransform,
+    NormalizeIntensityd,
+    Orientationd,
+    RandFlipd,
+    RandScaleIntensityd,
+    RandShiftIntensityd,
+    RandSpatialCropd,
+    Spacingd,
+    EnsureTyped,
+    EnsureChannelFirstd,
+)
 import os
 import numpy as np
 from tqdm import tqdm
@@ -64,12 +86,18 @@ def make_grid_image(image : torch.Tensor, label : torch.Tensor, prediction : tor
 
 def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, epochs=3):
     
+    train_transform = Compose([
+        # MapTransform(keys=["image", "label"]),
+        # ImagePreprocessing(),
+        LoadImaged(keys=["image", "label"]),
+        EnsureChannelFirstd(keys="image"),
+        EnsureTyped(keys=["image", "label"]),
+    ])
+    
     train_dataset = Dataset(
         image_dir=image_dir,
         label_dir=label_dir,
-        transform=transforms.Compose([
-            #transforms.ToTensor(),
-            ImagePreprocessing()]),
+        transform=train_transform,
         target_transform=transforms.Compose(transforms=[
             #transforms.ToTensor(),
             LabelPreprocessing(label_values),
@@ -120,6 +148,7 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
         writer = SummaryWriter(os.path.join(output_dir, tag))
     
     # training step
+    best_val_mean_dice = 0
     for epoch in range(epochs):
         model.train()
         train_loss = 0
@@ -146,11 +175,6 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
         train_loss /= len(train_dataloader)
         train_mean_dice /= len(train_dataloader)
         train_mean_dice_by_classes /= len(train_dataloader)
-        if output_dir:
-            torch.save(model.state_dict(), os.path.join(output_dir, "checkpoints", f"{tag}.pth"))
-            
-            writer.add_scalar("train_loss", train_loss, epoch+1)
-            writer.add_scalar("train_mean_dice", train_mean_dice, epoch+1)
         
         # validation step
         with torch.no_grad():
@@ -180,8 +204,19 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
                   "by classes: ", [f"{elem:.5}" for elem in val_mean_dice_by_classes])
             
             if output_dir:
+                if val_mean_dice > best_val_mean_dice:
+                    best_val_mean_dice = val_mean_dice
+                    torch.save(model.state_dict(), os.path.join(output_dir, "checkpoints", f"{tag}.pth"))
+                else:
+                    print(f"No improvement in val mean dice, skip saving checkpoint\n best_val_mean_dice={best_val_mean_dice:.5}")
+                
+                writer.add_scalar("train_loss", train_loss, epoch+1)
+                writer.add_scalar("train_mean_dice", train_mean_dice, epoch+1)
                 writer.add_scalar("val_loss", val_loss, epoch+1)
                 writer.add_scalar("val_mean_dice", val_mean_dice, epoch+1)
+                class_names = [value[1] for value in label_color_map.values()]
+                writer.add_scalars("train_mean_dice_by_classes", {class_names[i]: train_mean_dice_by_classes[i] for i in range(len(label_color_map))}, epoch+1)
+                writer.add_scalars("val_mean_dice_by_classes", {class_names[i]: val_mean_dice_by_classes[i] for i in range(len(label_color_map))}, epoch+1)
                 img_grid = make_grid_image(inputs, targets, outputs, 50)
                 writer.add_image("validation_grid", img_grid, epoch+1)
 
