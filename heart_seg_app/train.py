@@ -3,12 +3,12 @@ from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
-from torchvision.utils import make_grid
 
 torch.backends.cudnn.benchmark = True
 
 from heart_seg_app.utils.dataset import Dataset, ImagePreprocessing, LabelPreprocessing, label_postprocessing
 from heart_seg_app.utils.metrics import Metrics
+from heart_seg_app.utils.visualization import make_grid_image
 from heart_seg_app.models.unetr import unetr
 
 
@@ -49,46 +49,9 @@ label_color_map = {
     "green": [7.0, "the pulmonary artery"],
 }; label_values = [value[0] for value in label_color_map.values()]
 
-def make_grid_image(image : torch.Tensor, label : torch.Tensor, prediction : torch.Tensor, idx):
-        import matplotlib.cm as cm
-        import heart_seg_app.utils.visualization as visualization
-        bone_cmap = cm.get_cmap("bone")
-        cmap, norm = visualization.create_custom_cmap(label_color_map)
-
-        image = image.squeeze().cpu() # delete batch
-        image = image[:,:,idx].T
-        image = bone_cmap(image).astype(np.float32) # it converts tensor to numpy rgba image with hwc format
-        image = torch.from_numpy(image)
-        image = image[:,:,:3] # delete alpha channel
-        image = image.permute(2, 0, 1) # hwc -> chw
-        
-        label = label.squeeze().cpu() # delete batch
-        label = torch.argmax(label, dim=0)
-        label = label[:,:,idx].T
-        label = cmap(norm(label)).astype(np.float32) # it converts tensor to numpy rgba image with hwc format
-        label = torch.from_numpy(label)
-        label = label[:,:,:3] # delete alpha channel
-        label = label.permute(2, 0, 1) # hwc -> chw
-        
-        prediction = prediction.squeeze().float().cpu() # delete batch
-        prediction = torch.softmax(prediction, dim=0).argmax(dim=0)
-        prediction = prediction[:,:,idx].T
-        prediction = cmap(norm(prediction)).astype(np.float32) # it converts tensor to numpy rgba image with hwc format
-        prediction = torch.from_numpy(prediction)
-        prediction = prediction[:,:,:3] # delete alpha channel
-        prediction = prediction.permute(2, 0, 1) # hwc -> chw
-        
-        # print(image.shape, label.shape)
-        
-        img_grid = make_grid([image, label, prediction])
-        
-        return img_grid
-
 def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, epochs=3):
     
     train_transform = Compose([
-        # MapTransform(keys=["image", "label"]),
-        # ImagePreprocessing(),
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys="image"),
         EnsureTyped(keys=["image", "label"]),
@@ -97,9 +60,9 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
     train_dataset = Dataset(
         image_dir=image_dir,
         label_dir=label_dir,
-        transform=train_transform,
+        transform=transforms.Compose([
+            ImagePreprocessing()]),
         target_transform=transforms.Compose(transforms=[
-            #transforms.ToTensor(),
             LabelPreprocessing(label_values),
         ]),
         postfix=".gz.128128128.npy"
@@ -217,7 +180,5 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
                 class_names = [value[1] for value in label_color_map.values()]
                 writer.add_scalars("train_mean_dice_by_classes", {class_names[i]: train_mean_dice_by_classes[i] for i in range(len(label_color_map))}, epoch+1)
                 writer.add_scalars("val_mean_dice_by_classes", {class_names[i]: val_mean_dice_by_classes[i] for i in range(len(label_color_map))}, epoch+1)
-                img_grid = make_grid_image(inputs, targets, outputs, 50)
+                img_grid = make_grid_image("tensorboard", inputs, targets, outputs, label_color_map, 50)
                 writer.add_image("validation_grid", img_grid, epoch+1)
-
-    # writer.close()
