@@ -1,6 +1,102 @@
 import os
-import torch
 import numpy as np
+
+import torch
+import torch.utils.data
+
+from monai.transforms import MapTransform
+
+def collect_data_paths(image_dir, label_dir, prefix="", postfix="") -> list:
+    """
+    Collects image and label file paths from the specified directories.
+    
+    Args:
+        image_dir (str): Directory containing image files.
+        label_dir (str): Directory containing label files.
+        prefix (str, optional): Prefix to filter files. Defaults to "".
+        postfix (str, optional): Postfix to filter files. Defaults to "".
+
+    Returns:
+        list: List of dictionaries with "image" and "label" keys.
+    """
+    data = []
+    image_paths = sorted(
+        [os.path.relpath(os.path.join(image_dir, path), start=os.getcwd()) for path in os.listdir(image_dir) 
+         if path.startswith(prefix) and path.endswith(f"_image.nii{postfix}")]
+    )
+    label_paths = sorted(
+        [os.path.relpath(os.path.join(label_dir, path), start=os.getcwd()) for path in os.listdir(label_dir) 
+         if path.startswith(prefix) and path.endswith(f"_label.nii{postfix}")]
+    )
+    
+    for image, label in zip(image_paths, label_paths):
+        data.append({"image": image, "label": label})
+    
+    return data
+
+def split_dataset(data, split_ratios=(0.75, 0.2, 0.05), seed=0) -> dict:
+    """
+    Splits dataset into training, validation, and test sets based on given ratios.
+    
+    Args:
+        data (list): List of dataset entries.
+        split_ratios (tuple, optional): Tuple containing split ratios for train, val, and test. Defaults to (0.75, 0.2, 0.05).
+        seed: Random seed for reproducibility
+
+    Returns:
+        dict: Dictionary with "train", "val", and "test" keys mapping to dataset subsets.
+    """
+    train_size = int(split_ratios[0] * len(data))
+    val_size = int(split_ratios[1] * len(data))
+    test_size = len(data) - train_size - val_size
+    
+    if seed:
+        torch.manual_seed(seed)
+    train_data, val_data, test_data = torch.utils.data.random_split(data, [train_size, val_size, test_size])
+    
+    return {
+        "train": [data[i] for i in train_data.indices],
+        "val": [data[i] for i in val_data.indices],
+        "test": [data[i] for i in test_data.indices]
+    }
+
+class ToOneHotd(MapTransform):
+    """
+    MONAI-совместимая трансформация для предобработки меток.  
+    Преобразует значения меток в one-hot представление.
+    """
+
+    def __init__(self, keys, label_values):
+        """
+        Args:
+            keys (list): Список ключей, к которым применяется трансформация (например, ["label"]).
+            label_values (list): Список значений меток для one-hot кодирования.
+        """
+        super().__init__(keys)
+        self.label_values = label_values
+
+    def __call__(self, data):
+        """
+        Применение трансформации.
+        
+        Args:
+            data (dict): Словарь, содержащий `keys` (обычно "label") с изображением метки.
+        
+        Returns:
+            dict: Обновленный словарь с преобразованными метками.
+        """
+        d = dict(data)
+        for key in self.keys:
+            label = d[key]  # Получаем маску
+            values = self.label_values
+            processed_label = torch.zeros((len(values), *label.shape), dtype=torch.float32)
+            
+            for i, value in enumerate(values):
+                processed_label[i] = torch.where(label == value, 1.0, 0.0)
+
+            d[key] = processed_label
+        
+        return d
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, image_dir, label_dir, transform=None, target_transform=None, prefix="", postfix=""):
@@ -8,11 +104,11 @@ class Dataset(torch.utils.data.Dataset):
         self.inputs_paths = []
         self.targets_paths = []
 
-        for path in os.listdir(image_dir):
+        for path in sorted(os.listdir(image_dir)):
             if path.startswith(prefix) and path.endswith(f"_image.nii{postfix}"):
                 self.inputs_paths.append(os.path.join(image_dir, path))
                 
-        for path in os.listdir(label_dir):
+        for path in sorted(os.listdir(label_dir)):
             if path.startswith(prefix) and path.endswith(f"_label.nii{postfix}"):
                 self.targets_paths.append(os.path.join(label_dir, path))
 

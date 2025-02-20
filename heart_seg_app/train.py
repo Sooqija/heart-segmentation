@@ -1,38 +1,27 @@
 import torch
 from torch.utils.data import DataLoader
-from torch.utils.data import random_split
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms
 
 torch.backends.cudnn.benchmark = True
 
-from heart_seg_app.utils.dataset import Dataset, ImagePreprocessing, LabelPreprocessing, label_postprocessing
+from heart_seg_app.utils.config import save_config, load_config
+from heart_seg_app.utils.dataset import (
+    ToOneHotd,
+    collect_data_paths, split_dataset, label_postprocessing)
 from heart_seg_app.utils.metrics import Metrics
 from heart_seg_app.utils.visualization import make_grid_image
 from heart_seg_app.models.unetr import unetr
 
-
-from monai.apps import DecathlonDataset
-
+from monai.data.dataset import Dataset
+from monai.data import DataLoader, NumpyReader
 from monai.transforms import (
-    Activations,
-    Activationsd,
-    AsDiscrete,
-    AsDiscreted,
-    Compose,
-    Invertd,
-    LoadImaged,
-    MapTransform,
-    NormalizeIntensityd,
-    Orientationd,
-    RandFlipd,
-    RandScaleIntensityd,
-    RandShiftIntensityd,
-    RandSpatialCropd,
-    Spacingd,
-    EnsureTyped,
-    EnsureChannelFirstd,
+    Compose, LoadImaged, EnsureChannelFirstd, EnsureTyped, Spacingd, 
+    RandFlipd, RandAffined, RandGaussianNoised, RandGaussianSmoothd, 
+    NormalizeIntensityd, RandAdjustContrastd, Rand3DElasticd,
 )
+from monai.losses import DiceLoss
+from monai.utils import set_determinism
+
 import os
 import numpy as np
 from tqdm import tqdm
@@ -49,44 +38,73 @@ label_color_map = {
     "green": [7.0, "the pulmonary artery"],
 }; label_values = [value[0] for value in label_color_map.values()]
 
-def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, epochs=3):
-    
-    train_transform = Compose([
-        LoadImaged(keys=["image", "label"]),
-        EnsureChannelFirstd(keys="image"),
-        EnsureTyped(keys=["image", "label"]),
-    ])
-    
-    train_dataset = Dataset(
-        image_dir=image_dir,
-        label_dir=label_dir,
-        transform=transforms.Compose([
-            ImagePreprocessing()]),
-        target_transform=transforms.Compose(transforms=[
-            LabelPreprocessing(label_values),
-        ]),
-        postfix=".gz.128128128.npy"
-    )
-    
-    print("Dataset size: {}".format(len(train_dataset)))
-    
-    train_size = int(0.75 * len(train_dataset))
-    val_size = int(0.2 * len(train_dataset))
-    test_size = len(train_dataset) - train_size - val_size
-    print(f"train_images: {train_size}, validation_images: {val_size}, test_images {test_size}")
+hyperparams = {
+    "model": "UnetR",
+    "optimizer": {
+        "type": "AdamW",
+        "params": {
+            "lr": 1e-4,
+            "weight_decay": 1e-5,
+        }
+    },
+    "loss_function": "CELoss",
+    "epochs": 0,
+    "batch_size": 1,
+}
 
-    torch.manual_seed(0)
-    train_dataset, val_dataset, test_dataset = random_split(
-        train_dataset, [train_size, val_size, test_size]
-    )
+def train(model, image_dir, label_dir, dataset_config=None, split_ratios=(0.75, 0.2, 0.05), seed=0, tag="", checkpoint=None, output_dir=None, epochs=3):
+    data = collect_data_paths(image_dir, label_dir, postfix=".gz.128128128.npy")
+    print(f"Dataset Size: {len(data)}")
+    
+    if dataset_config:
+        dataset = load_config(dataset_config)
+    else:
+        dataset = split_dataset(data, split_ratios=split_ratios, seed=seed)
+
+    print("train_size: {}, val_size: {}, test_size: {}".format(len(dataset["train"]), len(dataset["val"]), len(dataset["test"])))
+    
+    train_transforms = Compose([
+        LoadImaged(keys=["image", "label"], reader=NumpyReader),
+        EnsureChannelFirstd(keys=["image"]),
+        ToOneHotd(keys=["label"], label_values=label_values),
+        EnsureTyped(keys=["image", "label"]),
+        
+        # Spacing
+        Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
+        RandFlipd(keys=["image", "label"], spatial_axis=0, prob=0.5),
+        RandAffined(
+            keys=["image", "label"], 
+            prob=0.7,
+            rotate_range=(0.1, 0.1, 0.1), 
+            scale_range=(0.1, 0.1, 0.1), 
+            translate_range=(5, 5, 5), 
+            mode=("bilinear", "nearest")
+        ),
+        Rand3DElasticd(keys=["image", "label"], prob=0.2, sigma_range=(5, 8), magnitude_range=(100, 200)),
+
+        # Intensity
+        NormalizeIntensityd(keys=["image"], channel_wise=True),  # (data - mean) / std
+        RandAdjustContrastd(keys=["image"], prob=0.3, gamma=(0.7, 1.5)),
+        RandGaussianNoised(keys=["image"], prob=0.15, mean=0, std=0.05),
+        RandGaussianSmoothd(keys=["image"], prob=0.1, sigma_x=(0.5, 1.5)),
+
+        # Crop
+        # RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(128, 128, 128), num_samples=2), 
+    ])
+    val_transforms = Compose([
+        LoadImaged(keys=["image", "label"], reader=NumpyReader),
+        EnsureChannelFirstd(keys=["image"]),
+        ToOneHotd(keys=["label"], label_values=label_values),
+        EnsureTyped(keys=["image", "label"]),
+        Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
+        NormalizeIntensityd(keys=["image"], channel_wise=True),    
+    ])
+
+    train_dataset = Dataset(dataset["train"], transform=train_transforms)
+    val_dataset = Dataset(dataset["val"], transform=val_transforms)
     
     train_dataloader = DataLoader(train_dataset, batch_size=1)
     val_dataloader = DataLoader(val_dataset, batch_size=1)
-    test_dataloader = DataLoader(test_dataset, batch_size=1)
-    
-    print("Test Data:")
-    for i in test_dataset.indices:
-        print(os.path.basename(test_dataset.dataset.inputs_paths[i]))
     
     # model
     if model == "unetr":
@@ -96,13 +114,14 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
         model.load_state_dict(torch.load(os.path.join(checkpoint), weights_only=True))
     model = model.to(device)
     
-    loss_function = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    loss_function = DiceLoss(smooth_nr=0, smooth_dr=1e-5, squared_pred=True, sigmoid=True)
+    optimizer = torch.optim.AdamW(model.parameters(), **(hyperparams["optimizer"]["params"]))
     
     if output_dir:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
             print("Save run's path: ", os.path.abspath(output_dir))
+            
         
         checkpoints_dir = os.path.join(output_dir, "checkpoints")
         if not os.path.exists(checkpoints_dir):
@@ -110,6 +129,12 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
         
         writer = SummaryWriter(os.path.join(output_dir, tag))
     
+        dataset["label_color_map"] = label_color_map
+        print("Save Dataset Config: ", os.path.join(output_dir, tag, "dataset.json"))
+        print("Save Hyperparams Config: ", os.path.join(output_dir, tag, "hyperparams.json"))
+        save_config(dataset, os.path.join(output_dir, tag, "dataset.json"))
+        save_config(hyperparams, os.path.join(output_dir, tag, "hyperparams.json"))
+        
     # training step
     best_val_mean_dice = 0
     for epoch in range(epochs):
@@ -118,16 +143,16 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
         train_mean_dice = 0
         train_mean_dice_by_classes = torch.zeros(len(label_values), device=device)
         for batch in tqdm(train_dataloader):
-            x, y = batch[0].cuda(), batch[1].cuda()
-            outputs = model(x)
-            loss = loss_function(outputs, y)
+            inputs, targets = batch["image"].to(device), batch["label"].to(device)
+            outputs = model(inputs)
+            loss = loss_function(outputs, targets)
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
             optimizer.zero_grad()
             
             outputs = label_postprocessing(outputs)
-            targets = y.int().squeeze(0)
+            targets = targets.int().squeeze(0)
             
             metrics = Metrics(outputs, targets)
             mean_dice = metrics.meanDice().item()
@@ -145,8 +170,8 @@ def train(model, image_dir, label_dir, tag, checkpoint=None, output_dir=None, ep
             val_loss = 0
             val_mean_dice = 0
             val_mean_dice_by_classes = torch.zeros(len(label_values), device=device)
-            for inputs, targets in tqdm(val_dataloader):
-                inputs, targets = inputs.to(device), targets.to(device)
+            for batch in tqdm(val_dataloader):
+                inputs, targets = batch["image"].to(device), batch["label"].to(device)
                 outputs = model(inputs)
                 loss = loss_function(outputs, targets)
                 val_loss += loss.item()
