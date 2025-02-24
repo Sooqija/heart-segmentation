@@ -1,5 +1,4 @@
 import torch
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 torch.backends.cudnn.benchmark = True
@@ -20,10 +19,9 @@ from monai.transforms import (
     NormalizeIntensityd, RandAdjustContrastd, Rand3DElasticd,
 )
 from monai.losses import DiceLoss
-from monai.utils import set_determinism
+from monai.utils import set_determinism, get_seed
 
 import os
-import numpy as np
 from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -39,7 +37,7 @@ label_color_map = {
 }; label_values = [value[0] for value in label_color_map.values()]
 
 hyperparams = {
-    "model": "UnetR",
+    "model": "UNETR",
     "optimizer": {
         "type": "AdamW",
         "params": {
@@ -47,12 +45,17 @@ hyperparams = {
             "weight_decay": 1e-5,
         }
     },
-    "loss_function": "CELoss",
+    "loss_function": "DiceLoss",
     "epochs": 0,
     "batch_size": 1,
+    "seed": None,
 }
 
 def train(model, image_dir, label_dir, dataset_config=None, split_ratios=(0.75, 0.2, 0.05), seed=0, tag="", checkpoint=None, output_dir=None, epochs=3):
+    set_determinism(seed=seed) if seed is not None else get_seed()
+    hyperparams["seed"] = seed
+    hyperparams["epochs"] = epochs
+    
     data = collect_data_paths(image_dir, label_dir, postfix=".gz.128128128.npy")
     print(f"Dataset Size: {len(data)}")
     
@@ -109,6 +112,7 @@ def train(model, image_dir, label_dir, dataset_config=None, split_ratios=(0.75, 
     # model
     if model == "unetr":
         model = unetr()
+        hyperparams["model"] = "UNETR"
     if checkpoint:
         print("Load Checkpoint:", os.path.basename(checkpoint))
         model.load_state_dict(torch.load(os.path.join(checkpoint), weights_only=True))

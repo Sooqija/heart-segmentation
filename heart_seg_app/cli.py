@@ -14,7 +14,7 @@ def main():
     parser.add_argument('--checkpoint', type=str, help="Path to model weights", default=None)
     parser.add_argument('--output_dir', type=str, help="Directory to save model checkpoints and training statistics.")
     parser.add_argument('-t', '--tag', type=str, help="Tag to label and track the current training run.", required=True)
-    parser.add_argument('--epochs', type=int, help="Numbers of epochs")
+    parser.add_argument('--epochs', type=int, help="Numbers of epochs", default=250)
     args = parser.parse_args()
 
     if args.mode == "train":

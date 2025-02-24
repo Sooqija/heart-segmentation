@@ -50,7 +50,7 @@ def split_dataset(data, split_ratios=(0.75, 0.2, 0.05), seed=0) -> dict:
     val_size = int(split_ratios[1] * len(data))
     test_size = len(data) - train_size - val_size
     
-    if seed:
+    if seed is not None:
         torch.manual_seed(seed)
     train_data, val_data, test_data = torch.utils.data.random_split(data, [train_size, val_size, test_size])
     
