@@ -34,6 +34,7 @@ def main():
         evaluate(model=args.model,
                  image_dir=args.image_dir,
                  label_dir=args.label_dir,
+                 dataset_config=args.dataset_config,
                  checkpoint=args.checkpoint,
                  output_dir=args.output_dir,
                  tag=args.tag)
