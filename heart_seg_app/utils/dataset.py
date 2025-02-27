@@ -62,32 +62,32 @@ def split_dataset(data, split_ratios=(0.75, 0.2, 0.05), seed=0) -> dict:
 
 class ToOneHotd(MapTransform):
     """
-    MONAI-совместимая трансформация для предобработки меток.  
-    Преобразует значения меток в one-hot представление.
+    MONAI-compatible transformation for label preprocessing.
+    Converts label values into one-hot representation.
     """
 
     def __init__(self, keys, label_values):
         """
         Args:
-            keys (list): Список ключей, к которым применяется трансформация (например, ["label"]).
-            label_values (list): Список значений меток для one-hot кодирования.
+            keys (list): List of keys to apply the transformation to (e.g., ["label"]).
+            label_values (list): List of label values for one-hot encoding.
         """
         super().__init__(keys)
         self.label_values = label_values
 
     def __call__(self, data):
         """
-        Применение трансформации.
-        
+        Applies the transformation.
+
         Args:
-            data (dict): Словарь, содержащий `keys` (обычно "label") с изображением метки.
-        
+            data (dict): A dictionary containing `keys` (usually "label") with the label image.
+
         Returns:
-            dict: Обновленный словарь с преобразованными метками.
+            dict: An updated dictionary with the transformed labels.
         """
         d = dict(data)
         for key in self.keys:
-            label = d[key]  # Получаем маску
+            label = d[key]
             values = self.label_values
             processed_label = torch.zeros((len(values), *label.shape), dtype=torch.float32)
             
