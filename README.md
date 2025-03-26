@@ -90,7 +90,7 @@ hsa eval \
 ## Datasets
 ### MM-WHS 2017 Dataset
 
-The MM-WHS 2017 dataset is a dataset for multi-modality whole heart segmentation. It provides 20 labeled and 40 unlabeled CT volumes, as well as 20 labeled and 40 unlabeled MR volumes. In total there are 120 multi-modality cardiac images acquired in a real clinical environment.
+The MM-WHS 2017 dataset is designed for multi-modality whole heart segmentation. It includes 20 labeled and 40 unlabeled CT volumes, as well as 20 labeled and 40 unlabeled MR volumes, totaling 120 multi-modality cardiac images acquired in a real clinical setting.
 **Publication Date: 2017**.
 
 #### Sources
@@ -99,7 +99,9 @@ Official Website: https://zmiclab.github.io/zxh/0/mmwhs/
 
 Download Link: https://mega.nz/folder/UNMF2YYI#1cqJVzo4p_wESv9P_pc8uA
 
-More About Dataset: https://github.com/openmedlab/Awesome-Medical-Dataset/blob/main/resources/MM-WHS.md
+Details: https://github.com/openmedlab/Awesome-Medical-Dataset/blob/main/resources/MM-WHS.md
+
+#### Visualization
 
 ![alt text](https://zmiclab.github.io/zxh/0/mmwhs/res/MMData2.png)
 *Official visualization*
@@ -109,7 +111,7 @@ More About Dataset: https://github.com/openmedlab/Awesome-Medical-Dataset/blob/m
 
 ### WHS CHD MICCAI19 Dataset
 
-
+This dataset consists of 68 3D CT images covering all seven key segmentation classes of the whole heart, along with additional anatomical structures. All images are provided with corresponding segmentation annotations.
 **Publication Date: 2023**.
 
 #### Sources
@@ -117,3 +119,8 @@ More About Dataset: https://github.com/openmedlab/Awesome-Medical-Dataset/blob/m
 Original Paper: https://doi.org/10.1007/978-3-030-32245-8_53
 
 Download Link: https://www.kaggle.com/datasets/xiaoweixumedicalai/chd68-segmentation-dataset-miccai19
+
+#### Visualization
+
+![alt text](https://github.com/Sooqija/heart-segmentation/blob/main/figures/vtk-miccai19.png)
+*Visualization via VTK*
