@@ -4,7 +4,7 @@
 
 The goal of whole heart segmentation is to extract the volume and shapes of all the substructures of the heart, commonly including the blood cavities of the four chambers, left ventricle myocardium, and sometimes the great vessels as well if they are of interest. The blood cavities of the fourchambers are: the left ventricle blood cavity, the right ventricle blood cavity, the left atrium blood cavity and the right atrium blood cavity.
 
-All goal cardiac substructures:
+All target cardiac substructures:
 - Left ventricle (LV)
 - Right ventricle (RV)
 - Left atrium (LA)
