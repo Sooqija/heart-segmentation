@@ -2,35 +2,90 @@
 
 ## Task
 
+The goal of whole heart segmentation is to extract the volume and shapes of all the substructures of the heart, commonly including the blood cavities of the four chambers, left ventricle myocardium, and sometimes the great vessels as well if they are of interest. The blood cavities of the fourchambers are: the left ventricle blood cavity, the right ventricle blood cavity, the left atrium blood cavity and the right atrium blood cavity.
 
+All goal cardiac substructures:
+- Left ventricle (LV)
+- Right ventricle (RV)
+- Left atrium (LA)
+- Right atrium (RA)
+- Myocardium (MYO)
+- Aorta (AO)
+- Pulmonary artery (PA)
+
+
+### Importance
+
+Cardiovascular diseases (CVDs) are the leading global cause of death, making accurate cardiac segmentation critical for:
+
+✔ Early diagnosis of coronary artery disease, valve defects, and other conditions
+
+✔ Precise surgical planning and intervention
+
+✔ Improved patient outcomes through detailed anatomical modeling
+
+While lifestyle factors (diet, smoking, exercise) influence heart health, advanced segmentation enables early detection of structural abnormalities, often before symptoms appear.
+
+### Visualization
+
+![image](https://github.com/user-attachments/assets/af676731-01e4-4d75-9b56-5d1dae056d7e)
+
+*RV – right ventricle; LV – left ventricle; MYO – myocardium; RA – right atrium; LA – left atrium; AO – aorta; PA – pulmonary artery.*
 
 ![alt text](https://zmiclab.github.io/zxh/0/mmwhs/res/WholeHeartSegment_ErrorMap_WhiteBg.gif)
 
+*Example segmentation output with error mapping*
 
 ## Installation
 
-To install console application `hsa` - heart segmentation app, run the following command.
+### Qiuck Start
+
+Install the `hsa` (Heart Segmentation App) via pip:
 
 ```
 pip install .
 ```
 
-To see all options run `hsa` with `--help` flag.
+### Command Help
+
+View all options:
 
 ```
 hsa --help
 ```
 
-## Examples
+## Usage Examples
 
-Example command to run script to train a model
+#### Training a Model
+
+Train a UNETR model with custom parameters:
+
+```bash
+hsa train \
+  --model unetr \
+  --image_dir "./image_folder" \
+  --label_dir "./data/label_folder" \
+  --output_dir "./runs" \
+  --tag "your-run-tag" \
+  --epochs 250 \
+  --seed 0 \
+  --dataset_config "./data/dataset.json"
+```
+
+#### Evaluation
+
+Evaluate a trained model:
 
 ```
-hsa train --model unetr --image_dir "./image_folder" --label_dir "./data/label_folder" --output_dir "./runs" --tag "your-run-tag" --epochs 250 --seed 0 --dataset_config "./data/data_folder/dataset.json"
+hsa eval \
+  --model unetr \
+  --checkpoint "./runs/checkpoints/checkpoint.pth" \
+  --image_dir "./image_folder" \
+  --label_dir "./data/label_folder" \
+  --output_dir "./runs" \
+  --tag "your-run-tag" \
+  --dataset_config "./data/dataset.json"
 ```
-
-
-
 
 ## Datasets
 ### MM-WHS 2017 Dataset
@@ -59,6 +114,6 @@ More About Dataset: https://github.com/openmedlab/Awesome-Medical-Dataset/blob/m
 
 #### Sources
 
-Original Paper: 
+Original Paper: https://doi.org/10.1007/978-3-030-32245-8_53
 
 Download Link: https://www.kaggle.com/datasets/xiaoweixumedicalai/chd68-segmentation-dataset-miccai19
