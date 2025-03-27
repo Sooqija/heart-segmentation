@@ -2,9 +2,6 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_lightning.utilities.model_summary import ModelSummary
-from pytorch_lightning.utilities.model_summary import LayerSummary
-
 
 class Unet3D(pl.LightningModule):
     

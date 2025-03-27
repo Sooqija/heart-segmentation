@@ -1,5 +1,19 @@
 import torch
 
+class Dice():
+    def __init__ (self, smooth=1e-6):
+        self.smooth = smooth
+        self.by_classes = torch.tensor([])
+        
+    def __call__(self, outputs : torch.Tensor, targets : torch.Tensor):
+        self.intersection = (outputs & targets).sum((2, 3, 4))
+        self.union = (outputs | targets).sum((2, 3, 4))
+        self.by_classes = (2 * self.intersection) / (self.union + self.intersection + self.smooth)
+        return self.by_classes.mean(dim=0)
+    
+    def mean(self):
+        return self.by_classes.mean(dim=1).mean(dim=0)
+
 class Metrics:
     """
     Computes various segmentation metrics suitable for heart segmentation task.
