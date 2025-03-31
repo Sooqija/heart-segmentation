@@ -10,18 +10,15 @@ import matplotlib.cm as cm
 
 from PIL import Image
 
-def create_custom_cmap(color_dict : dict):
-    pixel_values = [value[0] for value in color_dict.values()]
-    colors = color_dict.keys()
-
-    mid_bounds = [(pixel_values[i] + pixel_values[i+1]) / 2 for i in range(len(pixel_values)-1)]
-    custom_cmap = matplotlib.colors.ListedColormap(list(colors)[1:], N=len(colors)).with_extremes(under='black', over='green')
+def create_custom_cmap(label_values : list, colors : list):
+    under_color, over_color = colors[0], colors[-1]
+    mid_bounds = [(label_values[i] + label_values[i+1]) / 2 for i in range(len(label_values)-1)]
+    custom_cmap = matplotlib.colors.ListedColormap(list(colors)[1:], N=len(colors)).with_extremes(under=under_color, over=over_color)
     norm = matplotlib.colors.BoundaryNorm(mid_bounds, custom_cmap.N - 2)
     return custom_cmap, norm
 
-def vtk_visualize_3d_numpy_array(data : np.ndarray, color_dict : dict, apply_cfilter: bool = False):
-    pixel_values = [value[0] for value in color_dict.values()]
-    cmap, norm = create_custom_cmap(color_dict)
+def vtk_visualize_3d(data : np.ndarray, label_values : list, colors : list, apply_cfilter: bool = False):
+    cmap, norm = create_custom_cmap(label_values, colors)
     vtk_data = vtk.vtkImageData()
     vtk_data.SetDimensions(data.shape)
     vtk_data.SetSpacing([1, 1, 1])
@@ -36,13 +33,13 @@ def vtk_visualize_3d_numpy_array(data : np.ndarray, color_dict : dict, apply_cfi
     image = vtk_data
 
     actors = []
-    pixel_values = pixel_values[1:]
+    label_values = label_values[1:]
     renderer = vtk.vtkRenderer()
-    for i in range(len(pixel_values)):
+    for i in range(len(label_values)):
 
         marching_cubes = vtk.vtkDiscreteMarchingCubes()
         marching_cubes.SetInputData(image)
-        marching_cubes.SetValue(0, pixel_values[i])
+        marching_cubes.SetValue(0, label_values[i])
         marching_cubes.Update()
         mc_image = marching_cubes.GetOutputPort()
 
