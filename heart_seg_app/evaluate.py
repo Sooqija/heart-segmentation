@@ -35,8 +35,7 @@ def evaluate(model, image_dir, label_dir, dataset_config, checkpoint, output_dir
     data = collect_data_paths(image_dir, label_dir, postfix=".gz.128128128.npy")
     print(f"Dataset Size: {len(data)}")
     
-    if dataset_config:
-        dataset = load_config(dataset_config)
+    dataset = load_config(dataset_config)
     
     print("test_size: {}".format(len(dataset["test"])))
     
