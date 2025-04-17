@@ -205,7 +205,7 @@ def main():
         writer.add_scalars("Dice", {"train": train_dice, "val": val_dice}, epoch)
         
         # Save best model
-        if val_dice < best_dice:
+        if val_dice > best_dice:
             best_dice = val_dice
             torch.save(model.state_dict(), os.path.join(CHECKPOINT_DIR, "localization_best.pth"))
             print(f"No improvement in val mean dice, skip saving checkpoint\n best_val_mean_dice={best_dice:.5}")
